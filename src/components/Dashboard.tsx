@@ -47,19 +47,42 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState("today");
   const [emissionData, setEmissionData] = useState<any>({});
   const [totalEmissions, setTotalEmissions] = useState(0);
+  const [efficiency, setefficiency] = useState(0);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/total_emissions")
+    fetch("/api/total_emissions")
       .then(res => res.json())
       .then(data => {
         setEmissionData(data.breakdown);  // ✅ هذا الصحيح
         setTotalEmissions(data.total);
+        setNetEmissions(data.net_emissions);
+        setefficiency(data.efficiency);
       })
       .catch(err => console.error("Failed to fetch emissions", err));
   }, []);
 
+    const handleGenerateReport = () => {
+    fetch("/api/export_offset_report", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    })
+      .then((res) => res.blob())
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "offset-report.pdf";
+        a.click();
+        a.remove();
+      })
+      .catch((err) => {
+        console.error("PDF generation failed", err);
+      });
+  };
+const [netEmissions, setNetEmissions] = useState(0);
 const [totalOffset, setTotalOffset] = useState(0);
-const netEmissions = Math.max(0, totalEmissions / 1000 - totalOffset);
   return (
     <div className="min-h-screen bg-gradient-surface p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -100,11 +123,30 @@ const netEmissions = Math.max(0, totalEmissions / 1000 - totalOffset);
               <BarChart3 className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">10%</div>
-              <Progress value={10} className="mt-2" />
-              <p className="text-xs text-primary mt-2">Above industry average</p>
+              <div className="text-2xl font-bold text-foreground">
+                {efficiency.toLocaleString(undefined, { maximumFractionDigits: 1 })}%
+              </div>
+              <Progress value={efficiency} className="mt-2" />
+
+              {/* النص الديناميكي حسب النسبة واللون */}
+              <p
+                className={`text-xs mt-2 ${
+                  efficiency < 50
+                    ? "text-red-500"
+                    : efficiency <= 80
+                    ? "text-yellow-500"
+                    : "text-green-500"
+                }`}
+              >
+                {efficiency < 50
+                  ? "Below industry average"
+                  : efficiency <= 80
+                  ? "Industry average"
+                  : "Above industry average"}
+              </p>
             </CardContent>
           </Card>
+
         </div>
 
         <h2 className="text-2xl font-semibold mb-6 text-foreground">Real-Time Carbon Emissions by Source</h2>
@@ -149,9 +191,9 @@ const netEmissions = Math.max(0, totalEmissions / 1000 - totalOffset);
           })}
         </div>
 
-        {/* <div className="flex flex-wrap gap-4 justify-center">
-          <Button className="glow-button">Generate Report</Button>
-        </div> */}
+        <div className="flex justify-center">
+          <Button className="glow-button" onClick={handleGenerateReport}>Generate Report</Button>
+        </div>
       </div>
     </div>
   );

@@ -6,10 +6,10 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
-import { 
-  Trees, 
-  Fuel, 
-  Target, 
+import {
+  Trees,
+  Fuel,
+  Target,
   TrendingDown,
   Leaf,
   Plane,
@@ -41,30 +41,30 @@ const offsetTypes: OffsetType[] = [
   {
     name: "Tree Planting",
     unit: "trees",
-    impactRate: 25, // ✅ تحديث بناءً على متوسط الأشجار في مناخ السعودية
+    impactRate: 0.025, // ✅ تحديث بناءً على متوسط الأشجار في مناخ السعودية
     icon: "🌳",
-    color: "success"
+    color: "green-500"
   },
   {
     name: "RECs",
     unit: "MWh",
-    impactRate: 568, // ✅ تحديث بناءً على عامل الانبعاث في شبكة الكهرباء السعودية
+    impactRate: 0.568, // ✅ تحديث بناءً على عامل الانبعاث في شبكة الكهرباء السعودية
     icon: "📜",
-    color: "warning"
+    color: "yellow-500"
   },
   {
     name: "Carbon Credit",
     unit: "tCO₂e",
-    impactRate: 1000, // ✅ ثابت عالمي (1 طن = 1000 كجم)
+    impactRate: 1, // ✅ ثابت عالمي (1 طن = 1000 كجم)
     icon: "📜",
-    color: "accent"
+    color: "purple-500"
   },
   {
     name: "Renewable Energy",
     unit: "MWh",
-    impactRate: 568, // ✅ نفس قيمة RECs لأنها تعوض نفس كمية الانبعاثات
+    impactRate: 0.568, // ✅ نفس قيمة RECs لأنها تعوض نفس كمية الانبعاثات
     icon: "⚡",
-    color: "primary"
+    color: "blue-500"
   }
 ];
 
@@ -73,10 +73,23 @@ import Header from "@/components/Header";
 
 export default function CarbonOffsetAnalysis() {
   const [strategies, setStrategies] = useState<OffsetStrategy[]>([
-    { id: "1", type: "Tree Planting", value: 1000, unit: "trees", impactRate: 22 },
-  
+    { id: "1", type: "Tree Planting", value: 1000, unit: "trees", impactRate: 0.025 },
+
   ]);
-// داخل function CarbonOffsetAnalysis() { ... }
+// عند فتح الصفحة، نحمل البيانات من التخزين المحلي
+useEffect(() => {
+  const savedStrategies = localStorage.getItem("offset_strategies");
+  if (savedStrategies) {
+    setStrategies(JSON.parse(savedStrategies));
+  }
+}, []);
+
+// عند كل تعديل على الاستراتيجيات، نحفظها
+useEffect(() => {
+  localStorage.setItem("offset_strategies", JSON.stringify(strategies));
+}, [strategies]);
+
+  // داخل function CarbonOffsetAnalysis() { ... }
 
 const handleGenerateReport = () => {
   fetch("http://localhost:5000/api/export_offset_report", {
@@ -92,7 +105,7 @@ const handleGenerateReport = () => {
       strategies: strategies.map((s) => ({
         type: s.type,
         value: s.value,
-        impact: calculateStrategyImpact(s).toFixed(1),
+        impact: calculateStrategyImpact(s).toFixed(0),
         percentage: ((calculateStrategyImpact(s) / totalOffset) * 100).toFixed(0)
       }))
     })
@@ -114,7 +127,7 @@ const handleGenerateReport = () => {
   const [emissionData, setEmissionData] = useState<any>({});
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/total_emissions")
+    fetch("/api/total_emissions")
       .then(res => res.json())
       .then(data => {
         setEmissionData(data.breakdown);  // ✅ هذا الصحيح
@@ -124,17 +137,17 @@ const handleGenerateReport = () => {
   }, []);
   // Mock baseline emissions data
   const baselineEmissions = 5847; // kg CO2
-  
+
   // Calculate total offset
   const totalOffset = strategies.reduce((total, strategy) => {
     if (strategy.type === "SAF Usage") {
-      return total + (totalEmissions  * strategy.value / 100 * 0.8) / 1000;
+      return total + (totalEmissions  * strategy.value / 100 * 0.8);
     }
-    return total + (strategy.value * strategy.impactRate) / 1000;
+    return total + (strategy.value * strategy.impactRate);
   }, 0);
-  
-  const netEmissions = Math.max(0, totalEmissions  / 1000 - totalOffset);
-  const reductionPercentage = Math.min(100, (totalOffset / (totalEmissions  / 1000)) * 100);
+
+  const netEmissions = Math.max(0, totalEmissions  - totalOffset);
+  const reductionPercentage = Math.min(100, (totalOffset / (totalEmissions )) * 100);
   const isNetZero = netEmissions <= 0.1;
 
   const addStrategy = () => {
@@ -176,14 +189,26 @@ const handleGenerateReport = () => {
 
   const getOffsetColor = (type: string) => {
     const offsetType = offsetTypes.find(t => t.name === type);
-    return offsetType?.color || "success";
+    return offsetType?.color || "gray-400";
   };
+
+  const tailwindColor = (color: string) => {
+    const colors: { [key: string]: string } = {
+      "green-500": "#22c55e",
+      "yellow-500": "#eab308",
+      "purple-500": "#a855f7",
+      "blue-500": "#3b82f6",
+      "gray-400": "#9ca3af" // fallback
+    };
+    return colors[color] || "#999";
+  };
+
 
   const calculateStrategyImpact = (strategy: OffsetStrategy) => {
     if (strategy.type === "SAF Usage") {
-      return (totalEmissions  * strategy.value / 100 * 0.8) / 1000;
+      return (totalEmissions  * strategy.value / 100 * 0.8) ;
     }
-    return (strategy.value * strategy.impactRate) / 1000;
+    return (strategy.value * strategy.impactRate);
   };
 
   return (
@@ -197,14 +222,14 @@ const handleGenerateReport = () => {
             Carbon Offset Analysis
           </h1>
           <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
-            Design and visualize multiple carbon offset strategies to achieve net-zero emissions. 
+            Design and visualize multiple carbon offset strategies to achieve net-zero emissions.
             Mix different offset types to optimize your carbon reduction approach.
           </p>
         </div>
 
         {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Left Panel - Input Controls */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="neuro-card">
@@ -214,8 +239,8 @@ const handleGenerateReport = () => {
                     <Calculator className="h-5 w-5 text-primary" />
                     <span>Offset Strategies</span>
                   </span>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={addStrategy}
                     className="glow-button"
                   >
@@ -224,7 +249,7 @@ const handleGenerateReport = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                
+
                 {strategies.map((strategy, index) => (
                   <div key={strategy.id} className="space-y-4 p-4 neuro-inset rounded-lg">
                     <div className="flex items-center justify-between">
@@ -233,8 +258,8 @@ const handleGenerateReport = () => {
                         <span className="font-medium text-sm">Strategy {index + 1}</span>
                       </div>
                       {strategies.length > 1 && (
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="ghost"
                           onClick={() => removeStrategy(strategy.id)}
                         >
@@ -242,10 +267,10 @@ const handleGenerateReport = () => {
                         </Button>
                       )}
                     </div>
-                    
+
                     <div className="space-y-3">
-                      <Select 
-                        value={strategy.type} 
+                      <Select
+                        value={strategy.type}
                         onValueChange={(value) => updateStrategy(strategy.id, 'type', value)}
                       >
                         <SelectTrigger className="w-full neuro-inset">
@@ -270,7 +295,7 @@ const handleGenerateReport = () => {
                             {strategy.value} {strategy.unit}
                           </Badge>
                         </div>
-                        
+
                         {strategy.type === "SAF Usage" ? (
                           <Slider
                             value={[strategy.value]}
@@ -296,7 +321,7 @@ const handleGenerateReport = () => {
                       <div className="p-2 bg-muted/50 rounded text-xs">
                         <span className="font-medium">Impact: </span>
                         <span className={`text-${getOffsetColor(strategy.type)} font-bold`}>
-                          -{calculateStrategyImpact(strategy).toFixed(1)} tCO₂
+                          -{calculateStrategyImpact(strategy).toFixed(0)} tCO₂
                         </span>
                       </div>
                     </div>
@@ -311,13 +336,13 @@ const handleGenerateReport = () => {
                       <div key={strategy.id} className="flex justify-between">
                         <span>{strategy.type}:</span>
                         <span className={`text-${getOffsetColor(strategy.type)} font-medium`}>
-                          -{calculateStrategyImpact(strategy).toFixed(1)} tCO₂
+                          -{calculateStrategyImpact(strategy).toFixed(0)} tCO₂
                         </span>
                       </div>
                     ))}
                     <div className="flex justify-between pt-1 border-t border-border">
                       <span className="font-medium">Combined Offset:</span>
-                      <span className="text-primary font-bold">-{totalOffset.toFixed(1)} tCO₂</span>
+                      <span className="text-primary font-bold">-{totalOffset.toFixed(0)} tCO₂</span>
                     </div>
                   </div>
                 </div>
@@ -328,7 +353,7 @@ const handleGenerateReport = () => {
 
           {/* Right Panel - Results & Visualizations */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Key Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="neuro-card">
@@ -337,7 +362,7 @@ const handleGenerateReport = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-foreground">
-                    {(totalEmissions  / 1000).toFixed(1)}
+                    {(totalEmissions ).toFixed(0)}
                   </div>
                   <div className="text-xs text-muted-foreground">tCO₂e</div>
                 </CardContent>
@@ -349,7 +374,7 @@ const handleGenerateReport = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-primary">
-                    {totalOffset.toFixed(1)}
+                    {totalOffset.toFixed(0)}
                   </div>
                   <div className="text-xs text-muted-foreground">tCO₂e reduced</div>
                 </CardContent>
@@ -361,7 +386,7 @@ const handleGenerateReport = () => {
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${isNetZero ? 'text-success' : 'text-foreground'}`}>
-                    {Math.max(0, (totalEmissions / 1000 - totalOffset)).toFixed(1)}
+                    {Math.max(0, (totalEmissions  - totalOffset)).toFixed(0)}
                   </div>
                   <div className="text-xs text-muted-foreground">tCO₂e remaining</div>
                 </CardContent>
@@ -382,7 +407,7 @@ const handleGenerateReport = () => {
 
             {/* Visualization Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
+
               {/* Progress to Net Zero */}
               <Card className="neuro-card">
                 <CardHeader>
@@ -399,12 +424,12 @@ const handleGenerateReport = () => {
                       </div>
                       <div className="text-muted-foreground">towards net zero</div>
                     </div>
-                    
-                    <Progress 
-                      value={Math.min(100, reductionPercentage)} 
+
+                    <Progress
+                      value={Math.min(100, reductionPercentage)}
                       className="h-3"
                     />
-                    
+
                     {isNetZero && (
                       <div className="flex items-center justify-center mt-4 p-3 bg-success-light rounded-lg">
                         <Award className="h-5 w-5 text-success mr-2" />
@@ -425,12 +450,12 @@ const handleGenerateReport = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {strategies.map((strategy, strategyIndex) => {
+                    {strategies.map((strategy) => {
                       const impact = calculateStrategyImpact(strategy);
                       const impactPercentage = totalOffset > 0 ? (impact / totalOffset) * 100 : 0;
                       const filledDots = Math.round((impactPercentage / 100) * 10);
-                      const maxDots = 10; // Always 10 dots per row
-                      
+                      const maxDots = 10;
+
                       return (
                         <div key={strategy.id} className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
@@ -439,7 +464,7 @@ const handleGenerateReport = () => {
                               <span>{strategy.type}</span>
                             </span>
                             <span className={`text-${getOffsetColor(strategy.type)} font-medium`}>
-                              -{impact.toFixed(1)} tCO₂ ({impactPercentage.toFixed(0)}%)
+                              -{impact.toFixed(0)} tCO₂ ({impactPercentage.toFixed(0)}%)
                             </span>
                           </div>
                           <div className="grid grid-cols-10 gap-1">
@@ -447,23 +472,29 @@ const handleGenerateReport = () => {
                               <div
                                 key={i}
                                 className={`w-3 h-3 rounded-full transition-all duration-700 ease-out ${
-                                  i < filledDots 
-                                    ? `bg-${getOffsetColor(strategy.type)} shadow-glow` 
-                                    : 'bg-muted'
+                                  i < filledDots ? "shadow-glow" : "bg-muted"
                                 }`}
-                                title={`${((i + 1) / 10 * impactPercentage).toFixed(1)}% of total offset`}
+                                style={
+                                  i < filledDots
+                                    ? { backgroundColor: tailwindColor(getOffsetColor(strategy.type)) }
+                                    : {}
+                                }
+                                title={`${((i + 1) / 10 * impactPercentage).toFixed(0)}% of total offset`}
                               />
                             ))}
                           </div>
+
                         </div>
                       );
                     })}
                   </div>
+
                   <div className="text-center text-xs text-muted-foreground mt-4">
                     Each dot represents 10% of the offset strategy's contribution
                   </div>
                 </CardContent>
               </Card>
+
 
             </div>
 
